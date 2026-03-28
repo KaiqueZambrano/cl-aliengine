@@ -1,7 +1,5 @@
 ;;;; game.lisp
 
-(load "cl-aliengine.lisp")
-
 (in-package :cl-aliengine)
 
 ;; ------------------------------------------------------------
@@ -19,10 +17,18 @@
 (defparameter *pause-panel-entity* nil)
 
 ;; ------------------------------------------------------------
+;; Constants
+;; ------------------------------------------------------------
+
+(defparameter *player-speed* 600.0d0)
+
+(defconstant +layer-player+ 1)
+(defconstant +layer-walls+  2)
+
+;; ------------------------------------------------------------
 ;; Components
 ;; ------------------------------------------------------------
 
-(defcomponent velocity    (vx vy))
 (defcomponent player      ())
 (defcomponent dead        ())
 (defcomponent pause-panel ())
@@ -32,29 +38,23 @@
 ;; Systems
 ;; ------------------------------------------------------------
 
-(defsystem movement :with (transform velocity) :without (dead)
-  (setf transform.x (+ transform.x velocity.vx)
-        transform.y (+ transform.y velocity.vy)))
-
 (defsystem input :with (player velocity sprite)
+  (when (key-down-p 256)
+    (switch-scene 'pause-menu))
+
   (cond
-    ((key-down-p 256)
-     (switch-scene 'pause-menu))
-    ((key-down-p 262)
-     (setf velocity.vx  10
-           sprite.flip-x nil))
-    ((key-down-p 263)
-     (setf velocity.vx -10
-           sprite.flip-x t))
-    ((key-down-p 265) (setf velocity.vy -10))
-    ((key-down-p 264) (setf velocity.vy  10))
-    (t
-     (setf velocity.vx 0
-           velocity.vy 0))))
+    ((key-down-p 262) (setf velocity.vx  *player-speed* sprite.flip-x nil))
+    ((key-down-p 263) (setf velocity.vx (- *player-speed*) sprite.flip-x t))
+    (t                (setf velocity.vx  0.0d0)))
+
+  (cond
+    ((key-down-p 265) (setf velocity.vy (- *player-speed*)))
+    ((key-down-p 264) (setf velocity.vy  *player-speed*))
+    (t                (setf velocity.vy  0.0d0))))
 
 (defsystem select-animation :with (animator velocity)
   (setf animator.current
-        (if (> (abs velocity.vx) 0) :run :idle)))
+        (if (> (abs velocity.vx) 0.0d0) :run :idle)))
 
 (defsystem sync-hud :with (hud-panel ui-panel)
   (incf *frame-count*)
@@ -76,8 +76,8 @@
 
 (defscene gameplay
   :on-init
-  (let* ((tex-idle (asset-texture "example/assets/idle.png"))
-         (tex-run  (asset-texture "example/assets/run.png"))
+  (let* ((tex-idle (asset-texture "examples/platformer/assets/idle.png"))
+         (tex-run  (asset-texture "examples/platformer/assets/run.png"))
          (player-entity
            (spawn
              (player)
@@ -85,7 +85,13 @@
              (sprite    :texture tex-idle
                         :src-x 0 :src-y 0 :src-w 16 :src-h 16
                         :scale 4 :flip-x nil)
-             (velocity  :vx 0 :vy 0)
+             (velocity  :vx 0.0d0 :vy 0.0d0 :ax 0.0d0 :ay 0.0d0 :friction 0.0d0)
+             (collider  :w 56 :h 56
+                        :offset-x 4 :offset-y 4
+                        :layer +layer-player+
+                        :mask  +layer-walls+
+                        :solid t
+                        :on-collide nil)
              (animator  :animations
                           (make-animations
                             (idle :texture tex-idle
@@ -101,10 +107,26 @@
                         :last-animation nil))))
 
     (multiple-value-bind (ts w h tw th ly)
-        (load-tilemap "example/assets/level.json")
+        (load-tilemap "examples/platformer/assets/level.json")
       (spawn (transform :x 0 :y 0)
              (tilemap :tileset ts :width w :height h
                       :tile-width tw :tile-height th :layers ly))
+
+      (let ((col-layer (find "collidable" ly
+                             :key  (lambda (l) (getf l :name))
+                             :test #'equal)))
+        (when col-layer
+          (dolist (obj (getf col-layer :objects))
+            (spawn (transform :x (getf obj :x) :y (getf obj :y))
+                   (collider  :w       (getf obj :width)
+                              :h       (getf obj :height)
+                              :offset-x 0
+                              :offset-y 0
+                              :layer   +layer-walls+
+                              :mask    +layer-player+
+                              :solid   nil
+                              :on-collide nil)))))
+
       (let ((cam (spawn (camera :x 0 :y 0
                                 :smooth 6.0
                                 :target  player-entity
@@ -132,7 +154,7 @@
                                                transform.x transform.y)
                                        +nk-text-left+)
                              (ui-layout-row-dynamic 16 1)
-                             (ui-label (format nil "Vel  ~3d, ~3d"
+                             (ui-label (format nil "Vel  ~5,0f, ~5,0f"
                                                velocity.vx velocity.vy)
                                        +nk-text-left+)
                              (ui-layout-row-dynamic 2 1)
@@ -150,7 +172,8 @@
   (syscall update-camera)
   (syscall sync-hud)
   (syscall input)
-  (syscall movement)
+  (syscall physics)
+  (run-collisions)
   (syscall select-animation)
   (syscall animate)
   (syscall render-tilemaps)
