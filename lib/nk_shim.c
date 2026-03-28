@@ -5,14 +5,6 @@
  * function that needs struct/pointer arguments into flat C functions that
  * are trivial to call from SBCL's alien FFI.
  *
- * ── Prerequisites ────────────────────────────────────────────────────────────
- *  • nuklear.h              (https://github.com/Immediate-Mode-UI/Nuklear)
- *  • nuklear_glfw_gl3.h     (same repo, demo/glfw_opengl3/)
- *  • GLFW 3.x development headers + library
- *  • A C99-capable compiler
- *
- * Place this file, nuklear.h, and nuklear_glfw_gl3.h in the same directory.
- *
  * ── Compilation ──────────────────────────────────────────────────────────────
  *
  *  Linux:
@@ -27,11 +19,6 @@
  *    gcc -shared -O2 -o nk_shim.dll nk_shim.c \
  *        -lglfw3 -lopengl32 -lgdi32 -lm
  *
- * ── Usage ─────────────────────────────────────────────────────────────────────
- *  Load this file with (load "cl-aliengine-nuklear.lisp") after loading the
- *  engine.  Use RUN-WITH-UI instead of RUN, or call NUI-INIT / NUI-SHUTDOWN
- *  manually when embedding in an existing loop.
- * ─────────────────────────────────────────────────────────────────────────────
  */
 
 /* ── OpenGL — expose all core/extension prototypes before Nuklear ──────────── *
