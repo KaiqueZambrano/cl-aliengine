@@ -1,13 +1,6 @@
-(defpackage :cl-aliengine
-  "A minimal 2D game engine for Common Lisp built on GLFW, OpenGL 3.2 core, and libpng.
+;;;; cl-aliengine.lisp - Minimal 2D engine for CL
 
-  Architecture overview:
-    - Foreign library loading is platform-gated via reader conditionals.
-    - A texture batch renderer groups draw calls by texture to minimise GL state changes.
-    - An ECS (Entity Component System) drives all game logic via defcomponent / defsystem.
-    - Scenes wrap lifecycle hooks (:on-init :on-enter :on-going :on-exit).
-    - Tiled map support is provided through a zero-dependency JSON parser.
-    - A camera system applies a global pixel offset to every draw call."
+(defpackage :cl-aliengine
   (:use :cl :sb-alien :sb-sys))
 
 (in-package :cl-aliengine)
@@ -21,19 +14,22 @@
 (progn
   (load-shared-object "libglfw.so"  :dont-save t)
   (load-shared-object "libGL.so"    :dont-save t)
-  (load-shared-object "libpng.so"   :dont-save t))
+  (load-shared-object "libpng.so"   :dont-save t)
+  (load-shared-object "lib/libnk_shim.so"    :dont-save t))
 
 #+darwin
 (progn
   (load-shared-object "libglfw.dylib" :dont-save t)
   (load-shared-object "/System/Library/Frameworks/OpenGL.framework/OpenGL" :dont-save t)
-  (load-shared-object "libpng.dylib"  :dont-save t))
+  (load-shared-object "libpng.dylib"  :dont-save t)
+  (load-shared-object "lib/libnk_shim.dylib" :dont-save t))
 
 #+windows
 (progn
   (load-shared-object "glfw3.dll"    :dont-save t)
   (load-shared-object "opengl32.dll" :dont-save t)
-  (load-shared-object "libpng16.dll" :dont-save t))
+  (load-shared-object "libpng16.dll" :dont-save t)
+  (load-shared-object "lib/nk_shim.dll"      :dont-save t))
 
 
 ;;;; -------------------------------------------------------------------------
@@ -251,6 +247,353 @@
 
 (define-alien-routine ("fopen"  fopen)  (* t) (path c-string) (mode c-string))
 (define-alien-routine ("fclose" fclose) int   (file (* t)))
+
+
+;;;; =========================================================================
+;;;; Nuklear - Global state
+;;;; =========================================================================
+
+(defparameter *nk-ctx* nil
+  "Alien pointer to the nk_context.  Valid after NUI-INIT, NIL otherwise.
+  Macros like WITH-UI-WINDOW and UI-* implicitly use this context; you should
+  never need to pass it explicitly.")
+
+(defparameter *nk-active* nil
+  "T when the Nuklear layer is initialised and ready to accept widget calls.")
+
+
+;;;; =========================================================================
+;;;;  Nuklear - Constants: nk_text_alignment
+;;;; =========================================================================
+
+(defconstant +nk-text-left+     17
+  "Left-justify text within its layout cell.")
+(defconstant +nk-text-centered+ 18
+  "Centre text within its layout cell.")
+(defconstant +nk-text-right+    20
+  "Right-justify text within its layout cell.")
+
+
+;;;; =========================================================================
+;;;;  Nuklear - Constants: nk_panel_flags  (combine with LOGIOR)
+;;;; =========================================================================
+
+(defconstant +nk-window-border+         1)
+(defconstant +nk-window-movable+        2)
+(defconstant +nk-window-scalable+       4)
+(defconstant +nk-window-closable+       8)
+(defconstant +nk-window-minimizable+   16)
+(defconstant +nk-window-no-scrollbar+  32)
+(defconstant +nk-window-title+         64)
+(defconstant +nk-window-no-input+     512)
+
+(defconstant +nk-window-default+
+  (logior +nk-window-border+ +nk-window-movable+ +nk-window-title+)
+  "Bordered, movable window with a title bar.")
+(defconstant +nk-window-static+
+  (logior +nk-window-border+ +nk-window-title+ +nk-window-no-scrollbar+)
+  "Fixed window — suitable for HUDs that should not be dragged.")
+(defconstant +nk-window-tooltip+
+  (logior +nk-window-border+ +nk-window-no-scrollbar+ +nk-window-no-input+)
+  "Borderless overlay with no interaction — handy for debug overlays.")
+
+
+;;;; =========================================================================
+;;;;  Nuklear - FFI: lifecycle
+;;;; =========================================================================
+
+(define-alien-routine ("alien_nk_init"      %nk-init)      (* t) (win (* t)))
+(define-alien-routine ("alien_nk_shutdown"  %nk-shutdown)  void)
+(define-alien-routine ("alien_nk_new_frame" %nk-new-frame) void)
+(define-alien-routine ("alien_nk_render"    %nk-render)    void)
+
+
+;;;; =========================================================================
+;;;;  Nuklear - FFI: window management
+;;;; =========================================================================
+
+(define-alien-routine ("alien_nk_begin" %nk-begin) int
+  (ctx (* t)) (title c-string)
+  (x single-float) (y single-float)
+  (w single-float) (h single-float)
+  (flags unsigned-int))
+
+(define-alien-routine ("alien_nk_end" %nk-end) void (ctx (* t)))
+
+
+;;;; =========================================================================
+;;;; Nuklear FFI: layout
+;;;; =========================================================================
+
+(define-alien-routine ("alien_nk_layout_row_dynamic" %nk-layout-dynamic) void
+  (ctx (* t)) (height single-float) (cols int))
+
+(define-alien-routine ("alien_nk_layout_row_static" %nk-layout-static) void
+  (ctx (* t)) (height single-float) (item-width int) (cols int))
+
+(define-alien-routine ("alien_nk_layout_space_begin" %nk-space-begin) void
+  (ctx (* t)) (height single-float) (count int))
+
+(define-alien-routine ("alien_nk_layout_space_push" %nk-space-push) void
+  (ctx (* t)) (x single-float) (y single-float)
+  (w single-float) (h single-float))
+
+(define-alien-routine ("alien_nk_layout_space_end" %nk-space-end) void
+  (ctx (* t)))
+
+
+;;;; =========================================================================
+;;;; Nuklear FFI: widgets
+;;;; =========================================================================
+
+(define-alien-routine ("alien_nk_label" %nk-label) void
+  (ctx (* t)) (str c-string) (align unsigned-int))
+
+(define-alien-routine ("alien_nk_label_colored" %nk-label-colored) void
+  (ctx (* t)) (str c-string) (align unsigned-int)
+  (r unsigned-char) (g unsigned-char) (b unsigned-char) (a unsigned-char))
+
+(define-alien-routine ("alien_nk_button" %nk-button) int
+  (ctx (* t)) (label c-string))
+
+(define-alien-routine ("alien_nk_slider_float" %nk-slider-float) single-float
+  (ctx (* t))
+  (mn single-float) (val single-float) (mx single-float) (step single-float))
+
+(define-alien-routine ("alien_nk_slider_int" %nk-slider-int) int
+  (ctx (* t)) (mn int) (val int) (mx int) (step int))
+
+(define-alien-routine ("alien_nk_progress" %nk-progress) unsigned-long
+  (ctx (* t)) (cur unsigned-long) (mx unsigned-long) (modifiable int))
+
+(define-alien-routine ("alien_nk_check" %nk-check) int
+  (ctx (* t)) (label c-string) (active int))
+
+(define-alien-routine ("alien_nk_option" %nk-option) int
+  (ctx (* t)) (label c-string) (active int))
+
+(define-alien-routine ("alien_nk_property_int" %nk-prop-int) int
+  (ctx (* t)) (name c-string)
+  (mn int) (val int) (mx int) (step int) (inc single-float))
+
+(define-alien-routine ("alien_nk_property_float" %nk-prop-float) single-float
+  (ctx (* t)) (name c-string)
+  (mn single-float) (val single-float) (mx single-float)
+  (step single-float) (inc single-float))
+
+(define-alien-routine ("alien_nk_spacer"    %nk-spacer)    void (ctx (* t)))
+(define-alien-routine ("alien_nk_separator" %nk-separator) void (ctx (* t)))
+
+
+;;;; =========================================================================
+;;;; Nuklear - FFI: style
+;;;; =========================================================================
+
+(define-alien-routine ("alien_nk_style_window_bg" %nk-style-window-bg) void
+  (ctx (* t))
+  (r unsigned-char) (g unsigned-char) (b unsigned-char) (a unsigned-char))
+
+(define-alien-routine ("alien_nk_style_button_color" %nk-style-button-color) void
+  (ctx (* t))
+  (nr unsigned-char) (ng unsigned-char) (nb unsigned-char) (na unsigned-char)
+  (hr unsigned-char) (hg unsigned-char) (hb unsigned-char) (ha unsigned-char)
+  (ar unsigned-char) (ag unsigned-char) (ab unsigned-char) (aa unsigned-char))
+
+(define-alien-routine ("alien_nk_style_text_color" %nk-style-text-color) void
+  (ctx (* t))
+  (r unsigned-char) (g unsigned-char) (b unsigned-char) (a unsigned-char))
+
+
+;;;; =========================================================================
+;;;; Nuklear - Lifecycle public
+;;;; =========================================================================
+
+(defun nui-init ()
+  "Initialise the Nuklear GUI layer for *WINDOW*.
+  Call this inside a scene's :on-init hook, or let RUN-WITH-UI handle it.
+  Signals an error if the GLFW window is not yet open."
+  (unless *window*
+    (error "NUI-INIT called before the GLFW window was created.  ~
+            Use RUN-WITH-UI, or call NUI-INIT from inside :on-init."))
+  (let ((ctx (%nk-init *window*)))
+    (when (null-ptr-p ctx)
+      (error "Nuklear initialisation failed (alien_nk_init returned NULL)"))
+    (setf *nk-ctx*    ctx
+          *nk-active* t)))
+
+(defun nui-shutdown ()
+  "Shut down the Nuklear GUI layer and release its GPU resources.
+  Called automatically by RUN-WITH-UI when the game loop exits."
+  (when *nk-active*
+    (%nk-shutdown)
+    (setf *nk-ctx*    nil
+          *nk-active* nil)))
+
+(declaim (inline nui-new-frame nui-render))
+
+(defun nui-new-frame ()
+  "Begin a new Nuklear frame.  Called by RUN-WITH-UI before UPDATE each frame.
+  If you are not using RUN-WITH-UI, call this at the very start of :on-going."
+  (when *nk-active* (%nk-new-frame)))
+
+(defun nui-render ()
+  "Composite the Nuklear draw lists onto the framebuffer.
+  Called by RUN-WITH-UI after FLUSH-BATCH so the UI appears above sprites.
+  If you are not using RUN-WITH-UI, call this at the very end of :on-going."
+  (when *nk-active* (%nk-render)))
+
+
+;;;; =========================================================================
+;;;; Nuklear - High-level widget macros
+;;;; =========================================================================
+
+(defmacro with-ui-window ((title &key (x 10) (y 10) (w 200) (h 300)
+                                       (flags '+nk-window-default+))
+                          &body body)
+  "Open a Nuklear panel titled TITLE at screen position (X, Y) with size (W×H).
+  BODY is evaluated only when the panel is visible (not minimised/closed).
+  Always pairs BEGIN with END even when the panel is hidden.
+
+  Keyword options:
+    :x :y       — top-left screen position in pixels  (default 10, 10)
+    :w :h       — panel size in pixels                (default 200, 300)
+    :flags      — nk_panel_flags integer              (default +NK-WINDOW-DEFAULT+)
+
+  Example:
+    (with-ui-window (\"Settings\" :x 20 :y 20 :w 200 :h 140
+                                  :flags +nk-window-static+)
+      (ui-layout-row-dynamic 24 1)
+      (ui-label (format nil \"Volume: ~a\" *vol*))
+      (setf *vol* (ui-slider-int 0 *vol* 100)))"
+  (let ((ctx (gensym "CTX")))
+    `(when *nk-active*
+       (let ((,ctx *nk-ctx*))
+         (when (= 1 (%nk-begin ,ctx ,title
+                               (float ,x 1.0f0) (float ,y 1.0f0)
+                               (float ,w 1.0f0) (float ,h 1.0f0)
+                               ,flags))
+           ,@body)
+         (%nk-end ,ctx)))))
+
+;; Layout
+
+(defmacro ui-layout-row-dynamic (height cols)
+  "COLS equally-spaced columns of HEIGHT pixels each.
+  Columns resize with the window.  Most common layout choice."
+  `(%nk-layout-dynamic *nk-ctx* (float ,height 1.0f0) ,cols))
+
+(defmacro ui-layout-row-static (height item-width cols)
+  "COLS fixed-width (ITEM-WIDTH px) columns of HEIGHT pixels."
+  `(%nk-layout-static *nk-ctx* (float ,height 1.0f0) ,item-width ,cols))
+
+(defmacro with-ui-space ((height count) &body body)
+  "Free-placement layout: positions up to COUNT widgets manually.
+  Use UI-PLACE inside BODY to position each widget.
+
+  Example (absolute pixel positions within the panel):
+    (with-ui-space (80 2)
+      (ui-place 0 0 60 20)  (ui-label \"Name\")
+      (ui-place 64 0 120 20) (ui-label *player-name*))"
+  `(progn
+     (%nk-space-begin *nk-ctx* (float ,height 1.0f0) ,count)
+     ,@body
+     (%nk-space-end *nk-ctx*)))
+
+(defmacro ui-place (x y w h)
+  "Set the position for the next widget inside WITH-UI-SPACE."
+  `(%nk-space-push *nk-ctx*
+                   (float ,x 1.0f0) (float ,y 1.0f0)
+                   (float ,w 1.0f0) (float ,h 1.0f0)))
+
+;; Widgets
+
+(defmacro ui-label (text &optional (align '+nk-text-left+))
+  "Draw TEXT as a plain label.  ALIGN is one of the +NK-TEXT-*+ constants."
+  `(%nk-label *nk-ctx* ,text ,align))
+
+(defmacro ui-label-color (text r g b &optional (align '+nk-text-left+) (a 255))
+  "Like UI-LABEL but with an explicit RGBA colour (0–255 per channel)."
+  `(%nk-label-colored *nk-ctx* ,text ,align ,r ,g ,b ,a))
+
+(defmacro ui-button (label)
+  "Draw a push-button with LABEL.  Returns T on the frame it is clicked."
+  `(= 1 (%nk-button *nk-ctx* ,label)))
+
+(defmacro ui-slider-float (min val max &optional (step 0.01))
+  "Float slider from MIN to MAX in steps of STEP.  Returns the new float value."
+  `(%nk-slider-float *nk-ctx*
+                     (float ,min 1.0f0) (float ,val 1.0f0)
+                     (float ,max 1.0f0) (float ,step 1.0f0)))
+
+(defmacro ui-slider-int (min val max &optional (step 1))
+  "Integer slider from MIN to MAX in steps of STEP.  Returns the new integer."
+  `(%nk-slider-int *nk-ctx* ,min ,val ,max ,step))
+
+(defmacro ui-progress (cur max &optional (modifiable t))
+  "Progress bar.  CUR and MAX are non-negative integers.
+  When MODIFIABLE is T the user can drag the bar.
+  Returns the (possibly updated) CUR value."
+  `(%nk-progress *nk-ctx* ,cur ,max (if ,modifiable 1 0)))
+
+(defmacro ui-check (label val)
+  "Checkbox labelled LABEL.  VAL is the current boolean state.
+  Returns the new boolean state (T or NIL)."
+  `(= 1 (%nk-check *nk-ctx* ,label (if ,val 1 0))))
+
+(defmacro ui-option (label active-p)
+  "Radio button labelled LABEL.  Returns T when this option is selected.
+  Manage exclusivity manually:
+    (let ((sel (cond ((ui-option \"Easy\"   (eq *diff* :easy))   :easy)
+                     ((ui-option \"Medium\" (eq *diff* :medium)) :medium)
+                     ((ui-option \"Hard\"   (eq *diff* :hard))   :hard)
+                     (t *diff*)))
+      (setf *diff* sel))"
+  `(= 1 (%nk-option *nk-ctx* ,label (if ,active-p 1 0))))
+
+(defmacro ui-property-int (name min val max &optional (step 1) (inc 1.0))
+  "Spinner property field for integers.  Returns the new integer value.
+  INC-PER-PIXEL controls sensitivity when the user drags over the field."
+  `(%nk-prop-int *nk-ctx* ,name ,min ,val ,max ,step (float ,inc 1.0f0)))
+
+(defmacro ui-property-float (name min val max &optional (step 0.1) (inc 0.5))
+  "Spinner property field for floats.  Returns the new float value."
+  `(%nk-prop-float *nk-ctx* ,name
+                   (float ,min 1.0f0) (float ,val 1.0f0)
+                   (float ,max 1.0f0) (float ,step 1.0f0)
+                   (float ,inc 1.0f0)))
+
+(defmacro ui-spacer ()
+  "Skip one layout cell without drawing anything."
+  `(%nk-spacer *nk-ctx*))
+
+(defmacro ui-separator ()
+  "Draw a thin horizontal dividing line across the current row."
+  `(%nk-separator *nk-ctx*))
+
+;; Style helpers
+
+(defun ui-style-window-bg (r g b &optional (a 255))
+  "Set the background colour of the most recently opened panel.
+  R G B A are integers in [0, 255]."
+  (when *nk-active*
+    (%nk-style-window-bg *nk-ctx* r g b a)))
+
+(defun ui-style-text-color (r g b &optional (a 255))
+  "Set the global text colour.  R G B A are integers in [0, 255]."
+  (when *nk-active*
+    (%nk-style-text-color *nk-ctx* r g b a)))
+
+(defun ui-style-button-colors (nr ng nb
+                                hr hg hb
+                                ar ag ab
+                                &optional (na 255) (ha 255) (aa 255))
+  "Set button colours for normal / hover / active states.
+  Pass RGB integer triples (0–255); alpha defaults to 255."
+  (when *nk-active*
+    (%nk-style-button-color *nk-ctx*
+                             nr ng nb na
+                             hr hg hb ha
+                             ar ag ab aa)))
 
 
 ;;;; -------------------------------------------------------------------------
@@ -702,6 +1045,32 @@ void main() {
   "Return the component plist for NAME on ENTITY, or NIL if absent."
   (cdr (assoc name (cdr entity))))
 
+(defmacro query ((&key with without) &body body)
+  "Itera sobre *ENTITIES* e executa BODY para cada entidade que:
+   - contém todos os componentes listados em WITH (opcional)
+   - não contém nenhum dos componentes listados em WITHOUT (opcional)
+
+   Dentro de BODY, estão disponíveis:
+   - ENTITY-ID (o número da entidade)
+   - variáveis com o nome de cada componente em WITH (ex: transform, velocity)
+   - acesso a campos via ponto: transform.x, velocity.vx, etc.
+
+   Exemplo:
+     (query (:with (transform velocity) :without (dead))
+       (format t \"~a: pos=~a,~a vel=~a,~a~%\" entity-id
+               transform.x transform.y
+               velocity.vx velocity.vy))"
+  (let* ((with-list   (or with '()))
+         (without-list (or without '()))
+         (expanded-body
+           (mapcar (lambda (form) (%expand-dots form with-list)) body)))
+    `(dolist (entity *entities*)
+       (when (and ,@(mapcar (lambda (c) `(entity-has entity ',c)) with-list)
+                  ,@(mapcar (lambda (c) `(entity-lacks entity ',c)) without-list))
+         (let ((entity-id (car entity))
+               ,@(mapcar (lambda (c) `(,c (get-component entity ',c))) with-list))
+           ,@expanded-body)))))
+
 (defmacro defsystem (name &rest args)
   "Define a system named NAME that runs its body for every matching entity.
 
@@ -843,29 +1212,18 @@ void main() {
   (= 1 (glfw-get-key *window* key)))
 
 
+
 ;;;; -------------------------------------------------------------------------
 ;;;; Built-in components
 ;;;; -------------------------------------------------------------------------
 
-(defcomponent transform (x y)
-  "World-space position of an entity in pixels.
-  X increases to the right; Y increases downward.")
+(defcomponent transform (x y))
 
-(defcomponent sprite (texture src-x src-y src-w src-h scale :flip-x)
-  "Rendering data for a single textured quad.
-  TEXTURE — a GPU-TEXTURE (typically managed by the asset cache).
-  SRC-X SRC-Y SRC-W SRC-H — source rectangle within TEXTURE in pixels.
-  SCALE   — uniform scale factor applied to SRC-W and SRC-H.
-  FLIP-X  — when T the quad is mirrored horizontally.")
+(defcomponent sprite (texture src-x src-y src-w src-h scale :flip-x))
 
-(defcomponent animator (animations current current-time current-frame playing last-animation)
-  "Sprite sheet animator.
-  ANIMATIONS     — alist of keyword → animation plist (see MAKE-ANIMATIONS).
-  CURRENT        — keyword naming the active animation.
-  CURRENT-TIME   — accumulated playback time in seconds.
-  CURRENT-FRAME  — integer index into the current animation's frame list.
-  PLAYING        — boolean; set to NIL to pause.
-  LAST-ANIMATION — tracks the previous CURRENT value to detect animation changes.")
+(defcomponent animator (animations current current-time current-frame playing last-animation))
+
+(defcomponent ui-panel (title x y w h flags visible fn))
 
 
 ;;;; -------------------------------------------------------------------------
@@ -928,6 +1286,30 @@ void main() {
                 (* sprite.src-w sprite.scale)
                 (* sprite.src-h sprite.scale)
                 sprite.flip-x))
+
+(defsystem render-ui :with (ui-panel)
+  "Draw all visible UI panels for every entity that has a UI-PANEL component.
+  Always call this as the LAST system in :on-going when using RUN-WITH-UI,
+  so the panels composite on top of the sprite batch.
+
+  Example scene:
+    (defscene game
+      :on-going
+      (syscall update-camera)
+      (syscall animate)
+      (syscall render-sprites)
+      (syscall render-tilemaps)
+      (syscall render-ui))          ; ← must be last"
+  (when (and *nk-active* ui-panel.visible)
+    (when (= 1 (%nk-begin *nk-ctx*
+                          ui-panel.title
+                          (float ui-panel.x 1.0f0)
+                          (float ui-panel.y 1.0f0)
+                          (float ui-panel.w 1.0f0)
+                          (float ui-panel.h 1.0f0)
+                          ui-panel.flags))
+      (funcall ui-panel.fn))
+    (%nk-end *nk-ctx*)))
 
 
 ;;;; -------------------------------------------------------------------------
@@ -1239,14 +1621,7 @@ void main() {
 ;;;; Tiled map support — component and system
 ;;;; -------------------------------------------------------------------------
 
-(defcomponent tilemap (tileset width height tile-width tile-height layers)
-  "Holds the full state of a loaded Tiled map.
-  TILESET    — a TILEMAP-TILESET struct.
-  WIDTH      — map width in tiles.
-  HEIGHT     — map height in tiles.
-  TILE-WIDTH — tile width in pixels.
-  TILE-HEIGHT— tile height in pixels.
-  LAYERS     — list of layer plists produced by LOAD-TILEMAP.")
+(defcomponent tilemap (tileset width height tile-width tile-height layers))
 
 (defsystem render-tilemaps :with (transform tilemap)
   "Draw all visible tile layers of every entity that has TRANSFORM and TILEMAP.
@@ -1333,16 +1708,7 @@ void main() {
 ;;;; Camera — component and system
 ;;;; -------------------------------------------------------------------------
 
-(defcomponent camera (x y smooth target clamp-x0 clamp-y0 clamp-x1 clamp-y1)
-  "2D camera that optionally follows a target entity within configurable bounds.
-
-  X Y          — current camera position in world pixels (top-left of viewport).
-  SMOOTH       — lerp speed in units/second; 0 or NIL for immediate snap.
-                 Typical values: 4 (gentle) to 12 (snappy).
-  TARGET       — entity to follow (must have a TRANSFORM component), or NIL.
-  CLAMP-X0 Y0  — minimum world coordinates for the camera's top-left corner.
-  CLAMP-X1 Y1  — maximum world pixel extents (map width/height in pixels).
-                 Set either pair to NIL to disable clamping on that axis.")
+(defcomponent camera (x y smooth target clamp-x0 clamp-y0 clamp-x1 clamp-y1))
 
 (defsystem update-camera :with (camera)
   "Move the camera toward its TARGET using delta-time-independent lerp, then
@@ -1516,6 +1882,109 @@ void main() {
         (with-alien ((p unsigned-int vao) (q unsigned-int vbo))
           (gl-delete-vertex-arrays 1 (addr p))
           (gl-delete-buffers      1 (addr q)))
+        (gl-delete-program prog))))
+
+  (setf *window* nil)
+  (glfw-terminate))
+
+(defun run-with-ui (title width height fps initial-scene)
+  "Like RUN, but with the Nuklear GUI layer fully integrated.
+
+  TITLE         — window title string.
+  WIDTH HEIGHT  — window dimensions in pixels.
+  FPS           — target frame rate; 0 for uncapped.
+  INITIAL-SCENE — symbol naming the first scene to activate.
+
+  The frame sequence differs slightly from plain RUN:
+
+    1. glfwPollEvents is called FIRST so Nuklear sees fresh input.
+    2. nk_glfw3_new_frame — Nuklear processes that input.
+    3. glClear.
+    4. UPDATE — runs :on-going (declare panels and call SYSCALL render-ui here).
+    5. gl-use-program + FLUSH-BATCH — draw all queued sprite quads.
+    6. nk_glfw3_render — composite the Nuklear draw lists on top of sprites.
+    7. glfwSwapBuffers.
+    8. FPS cap if requested.
+
+  On exit, NUI-SHUTDOWN is called automatically before GLFW terminates."
+  (unless (= (glfw-init) 1)
+    (error "GLFW initialisation failed"))
+
+  (let ((win (glfw-create-window width height title (null-ptr) (null-ptr))))
+    (when (null-ptr-p win)
+      (glfw-terminate)
+      (error "Failed to create GLFW window"))
+
+    (setf *window*        win
+          *screen-width*  width
+          *screen-height* height)
+    (glfw-make-context-current win)
+    (glfw-swap-interval 0)
+
+    (gl-enable +blend+)
+    (gl-blend-func +src-alpha+ +one-minus-src-alpha+)
+
+    (let ((nk-ctx (%nk-init win)))
+      (when (null-ptr-p nk-ctx)
+        (glfw-terminate)
+        (error "Nuklear initialisation failed"))
+      (setf *nk-ctx*    nk-ctx
+            *nk-active* t))
+
+    (let ((prog (make-shader-program *vert-src* *frag-src*)))
+      (multiple-value-bind (vao vbo) (make-batch-renderer)
+        (setf *batch-vao*     vao
+              *batch-vbo*     vbo
+              *sprite-shader* prog)
+
+        (gl-use-program prog)
+        (gl-uniform-1i (gl-get-uniform-location prog "uTexture") 0)
+        (gl-uniform-4f (gl-get-uniform-location prog "uTint") 1.0f0 1.0f0 1.0f0 1.0f0)
+
+        (switch-scene initial-scene)
+
+        (let* ((target-dt (if (> fps 0) (/ 1.0d0 fps) 0.0d0))
+               (last-time (glfw-get-time)))
+
+          (loop while (= 0 (glfw-window-should-close win)) do
+            (glfw-poll-events)
+
+            (let* ((frame-start (glfw-get-time))
+                   (dt          (- frame-start last-time)))
+              (setf last-time frame-start)
+
+              (%nk-new-frame)
+
+              (gl-clear-color 0.2f0 0.2f0 0.2f0 1.0f0)
+              (gl-clear +color-buffer-bit+)
+
+              (let ((*dt* dt))
+                (update))
+
+              (gl-use-program *sprite-shader*)
+              (gl-enable +blend+)
+              (gl-blend-func +src-alpha+ +one-minus-src-alpha+)
+              (flush-batch)
+
+              (%nk-render)
+
+              (glfw-swap-buffers win)
+
+              (when (> target-dt 0.0d0)
+                (let ((remaining (- target-dt (- (glfw-get-time) frame-start))))
+                  (when (> remaining 0.002d0)
+                    (sleep (- remaining 0.002d0)))
+                  (loop while (< (- (glfw-get-time) frame-start) target-dt)))))))
+
+        (when *current-scene*
+          (funcall (getf *current-scene* :on-exit)))
+
+        (nui-shutdown)
+        (asset-free-all)
+
+        (with-alien ((p unsigned-int vao) (q unsigned-int vbo))
+          (gl-delete-vertex-arrays 1 (addr p))
+          (gl-delete-buffers       1 (addr q)))
         (gl-delete-program prog))))
 
   (setf *window* nil)
