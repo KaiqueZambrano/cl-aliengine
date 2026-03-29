@@ -1,4 +1,4 @@
-;; components.lisp
+;; src/physics/components.lisp
 
 (in-package :cl-aliengine)
 

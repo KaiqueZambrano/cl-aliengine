@@ -1,4 +1,4 @@
-;; components.lisp
+;; src/tilemap/components.lisp
 
 (in-package :cl-aliengine)
 

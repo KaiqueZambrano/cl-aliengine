@@ -1,4 +1,4 @@
-;; helpers.lisp
+;; src/tilemap/helpers.lisp
 
 (in-package :cl-aliengine)
 

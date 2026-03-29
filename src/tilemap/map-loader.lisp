@@ -1,4 +1,4 @@
-;; map-loader.lisp
+;; src/tilemap/map-loader.lisp
 
 (in-package :cl-aliengine)
 

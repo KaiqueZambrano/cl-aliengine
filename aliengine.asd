@@ -131,7 +131,9 @@
       :pathname "audio"
       :components
       ((:file "components")
+       (:file "helpers")
        (:file "globals")
+       (:file "lifecycle")
        (:file "systems")))
 
      (:module "runtime"

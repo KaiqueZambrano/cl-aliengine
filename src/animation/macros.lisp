@@ -1,4 +1,4 @@
-;; macros.lisp
+;; src/animation/macros.lisp
 
 (in-package :cl-aliengine)
 

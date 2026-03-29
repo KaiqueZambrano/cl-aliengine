@@ -1,4 +1,4 @@
-;; libpng-bindings.lisp
+;; src/core/libpng-bindings.lisp
 
 (in-package :cl-aliengine)
 

@@ -1,4 +1,4 @@
-;; opengl-bindings.lisp
+;; src/core/opengl-bindings.lisp
 
 (in-package :cl-aliengine)
 

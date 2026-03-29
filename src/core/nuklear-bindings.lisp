@@ -1,4 +1,4 @@
-;; nuklear-bindings.lisp
+;; src/core/nuklear-bindings.lisp
 
 (in-package :cl-aliengine)
 

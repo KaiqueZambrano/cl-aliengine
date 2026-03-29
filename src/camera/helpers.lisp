@@ -1,4 +1,4 @@
-;; helpers.lisp
+;; src/camera/helpers.lisp
 
 (in-package :cl-aliengine)
 

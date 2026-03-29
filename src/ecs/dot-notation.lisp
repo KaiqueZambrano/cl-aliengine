@@ -1,4 +1,4 @@
-;; dot-notation.lisp
+;; src/ecs/dot-notation.lisp
 
 (in-package :cl-aliengine)
 

@@ -1,4 +1,4 @@
-;; input.lisp
+;; src/input/input.lisp
 
 (in-package :cl-aliengine)
 

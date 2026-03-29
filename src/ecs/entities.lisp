@@ -1,4 +1,4 @@
-;; entities.lisp
+;; src/ecs/entities.lisp
 
 (in-package :cl-aliengine)
 

@@ -1,4 +1,4 @@
-;; texture-batch.lisp
+;; src/renderer/texture-batch.lisp
 
 (in-package :cl-aliengine)
 

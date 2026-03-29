@@ -1,4 +1,4 @@
-;; tileset.lisp
+;; src/tilemap/tileset.lisp
 
 (in-package :cl-aliengine)
 

@@ -1,4 +1,4 @@
-;; layer-parsing.lisp
+;; src/tilemap/layer-parsing.lisp
 
 (in-package :cl-aliengine)
 

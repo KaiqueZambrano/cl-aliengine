@@ -1,4 +1,4 @@
-;; components.lisp
+;; src/animation/components.lisp
 
 (in-package :cl-aliengine)
 

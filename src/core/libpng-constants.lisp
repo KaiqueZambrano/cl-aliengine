@@ -1,4 +1,4 @@
-;; libpng-constants.lisp
+;; src/core/libpng-constants.lisp
 
 (in-package :cl-aliengine)
 

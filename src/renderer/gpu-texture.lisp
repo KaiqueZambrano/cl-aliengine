@@ -1,4 +1,4 @@
-;; gpu-texture.lisp
+;; src/renderer/gpu-texture.lisp
 
 (in-package :cl-aliengine)
 

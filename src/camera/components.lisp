@@ -1,4 +1,4 @@
-;; components.lisp
+;; src/camera/components.lisp
 
 (in-package :cl-aliengine)
 

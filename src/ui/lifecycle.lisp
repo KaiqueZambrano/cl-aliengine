@@ -1,4 +1,4 @@
-;; lifecycle.lisp
+;; src/ui/lifecycle.lisp
 
 (in-package :cl-aliengine)
 

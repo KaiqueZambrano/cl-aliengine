@@ -1,4 +1,4 @@
-;; components.lisp
+;; src/ecs/components.lisp
 
 (in-package :cl-aliengine)
 

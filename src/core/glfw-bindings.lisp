@@ -1,4 +1,4 @@
-;; glfw-bindings.lisp
+;; src/core/glfw-bindings.lisp
 
 (in-package :cl-aliengine)
 

@@ -1,4 +1,4 @@
-;; resources.lisp
+;; src/ecs/resources.lisp
 
 (in-package :cl-aliengine)
 

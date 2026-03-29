@@ -1,4 +1,4 @@
-;; systems.lisp
+;; src/ecs/systems.lisp
 
 (in-package :cl-aliengine)
 
@@ -90,7 +90,6 @@
                  (:stage    (setf stage    v))
                  (:priority (setf priority v)))))
     (let* ((body          remaining)
-           ;; Dot-notation applies to both component and resource names.
            (all-names     (append with resource))
            (expanded-body (mapcar (lambda (form) (%expand-dots form all-names)) body))
            (res-bindings  (%resource-bindings resource)))

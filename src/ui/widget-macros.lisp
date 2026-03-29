@@ -1,4 +1,4 @@
-;; widget-macros.lisp
+;; src/ui/widget-macros.lisp
 
 (in-package :cl-aliengine)
 

@@ -1,4 +1,4 @@
-;; opengl-constants.lisp
+;; src/core/opengl-constants.lisp
 
 (in-package :cl-aliengine)
 

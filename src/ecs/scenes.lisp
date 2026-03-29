@@ -1,4 +1,4 @@
-;; scenes.lisp
+;; src/ecs/scenes.lisp
 
 (in-package :cl-aliengine)
 

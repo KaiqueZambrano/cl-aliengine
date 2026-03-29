@@ -1,4 +1,4 @@
-;; shaders.lisp
+;; src/renderer/shaders.lisp
 
 (in-package :cl-aliengine)
 

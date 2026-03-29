@@ -1,4 +1,4 @@
-;; nuklear-constants.lisp
+;; src/core/nuklear-constants.lisp
 
 (in-package :cl-aliengine)
 

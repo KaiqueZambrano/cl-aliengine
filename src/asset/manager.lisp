@@ -1,4 +1,4 @@
-;; manager.lisp
+;; src/asset/manager.lisp
 
 (in-package :cl-aliengine)
 

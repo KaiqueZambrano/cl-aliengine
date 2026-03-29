@@ -1,4 +1,4 @@
-;; globals.lisp
+;; src/asset/globals.lisp
 
 (in-package :cl-aliengine)
 

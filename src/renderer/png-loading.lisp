@@ -1,4 +1,4 @@
-;; png-loading.lisp
+;; src/renderer/png-loading.lisp
 
 (in-package :cl-aliengine)
 
