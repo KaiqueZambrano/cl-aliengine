@@ -2,7 +2,7 @@
 
 (in-package :cl-aliengine)
 
-(defsystem render-ui :with (ui-panel)
+(defsystem render-ui :with (ui-panel) :stage (:render) :priority 20
   "Draw all visible UI panels for every entity that has a UI-PANEL component.
   Always call this as the LAST system in :on-going when using RUN-WITH-UI,
   so the panels composite on top of the sprite batch.

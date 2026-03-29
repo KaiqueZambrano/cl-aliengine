@@ -2,7 +2,7 @@
 
 (in-package :cl-aliengine)
 
-(defsystem update-particles :with (transform particle-emitter)
+(defsystem update-particles :with (transform particle-emitter) :stage (:update)
   "Advance every live particle in PARTICLE-EMITTER and spawn new ones.
   Each particle is a plist: (:x :y :vx :vy :life :max-life).
 
@@ -51,7 +51,7 @@
 
     (setf particle-emitter.accumulator (- acc to-spawn))))
 
-(defsystem render-particles :with (particle-emitter)
+(defsystem render-particles :with (particle-emitter) :stage (:render) :priority 15
   "Draw every live particle owned by PARTICLE-EMITTER.
   Particles are centered on their (x, y) world-space position.
   Call AFTER UPDATE-PARTICLES and before FLUSH-BATCH."

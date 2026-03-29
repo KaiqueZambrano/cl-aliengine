@@ -2,7 +2,7 @@
 
 (in-package :cl-aliengine)
 
-(defsystem physics :with (transform velocity)
+(defsystem physics :with (transform velocity) :stage (:update)
   "Integrate acceleration and velocity into TRANSFORM each frame.
 
   Execution order inside DEFSCENE :on-going (recommended):

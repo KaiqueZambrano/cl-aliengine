@@ -1,4 +1,4 @@
-;; run.lisp
+;; src/runtime/run.lisp
 
 (in-package :cl-aliengine)
 
@@ -17,13 +17,19 @@
     4. Swap buffers and poll events.
     5. Busy-wait if necessary to honour the FPS cap.
 
-  On exit, :on-exit is called on the current scene, all assets are freed, and
-  the VAO/VBO and shader program are deleted before GLFW terminates."
+  On exit, :on-exit is called on the current scene, all audio pointers are
+  freed, all assets are freed, and the VAO/VBO and shader program are deleted
+  before GLFW terminates."
   (unless (= (glfw-init) 1)
     (error "GLFW initialisation failed"))
 
+  ;; Initialise audio before creating the window (no GL context needed).
+  (unless (audio-init)
+    (warn "Audio initialisation failed — continuing without sound."))
+
   (let ((win (glfw-create-window width height title (null-ptr) (null-ptr))))
     (when (null-ptr-p win)
+      (audio-shutdown)
       (glfw-terminate)
       (error "Failed to create GLFW window"))
 
@@ -75,6 +81,10 @@
 
         (when *current-scene*
           (funcall (getf *current-scene* :on-exit)))
+
+        ;; Free audio sources before shutting down the engine.
+        (audio-free-all)
+        (audio-shutdown)
 
         (asset-free-all)
 

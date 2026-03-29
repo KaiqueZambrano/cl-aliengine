@@ -12,6 +12,7 @@
      
      (:module "core"
       :depends-on ()
+      :serial t
       :pathname "core"
       :components
       ((:file "ffi-load")
@@ -23,13 +24,16 @@
        (:file "libpng-bindings")
        (:file "glfw-bindings")
        (:file "nuklear-constants")
-       (:file "nuklear-bindings")))
+       (:file "nuklear-bindings")
+       (:file "miniaudio-bindings")))
 
      (:module "ecs"
       :depends-on ()
+      :serial t
       :pathname "ecs"
       :components
       ((:file "globals")
+       (:file "resources")
        (:file "dot-notation")
        (:file "entities")
        (:file "components")
@@ -38,6 +42,7 @@
 
      (:module "renderer"
       :depends-on ("core" "ecs")
+      :serial t
       :pathname "renderer"
       :components
       ((:file "globals")
@@ -50,6 +55,7 @@
 
      (:module "asset"
       :depends-on ("core" "ecs" "renderer")
+      :serial t
       :pathname "asset"
       :components
       ((:file "globals")
@@ -57,11 +63,13 @@
 
      (:module "input"
       :depends-on ("core" "ecs")
+      :serial t
       :pathname "input"
       :components ((:file "input")))
 
      (:module "physics"
       :depends-on ("core" "ecs")
+      :serial t
       :pathname "physics"
       :components
       ((:file "components")
@@ -70,6 +78,7 @@
 
      (:module "animation"
       :depends-on ("core" "ecs" "renderer")
+      :serial t
       :pathname "animation"
       :components
       ((:file "components")
@@ -78,6 +87,7 @@
 
      (:module "particles"
       :depends-on ("core" "ecs" "renderer")
+      :serial t
       :pathname "particles"
       :components
       ((:file "components")
@@ -85,6 +95,7 @@
 
      (:module "camera"
       :depends-on ("core" "ecs")
+      :serial t
       :pathname "camera"
       :components
       ((:file "components")
@@ -93,6 +104,7 @@
 
      (:module "tilemap"
       :depends-on ("core" "ecs" "renderer")
+      :serial t
       :pathname "tilemap"
       :components
       ((:file "json-parser")
@@ -105,6 +117,7 @@
 
      (:module "ui"
       :depends-on ("core" "ecs" "renderer")
+      :serial t
       :pathname "ui"
       :components
       ((:file "lifecycle")
@@ -112,9 +125,18 @@
        (:file "widget-macros")
        (:file "systems")))
 
+     (:module "audio"
+      :depends-on ("core" "ecs")
+      :serial t
+      :pathname "audio"
+      :components
+      ((:file "components")
+       (:file "globals")
+       (:file "systems")))
+
      (:module "runtime"
-      :depends-on ("core" "ecs" "renderer" "input" "physics" "animation"
-                   "particles" "camera" "tilemap" "ui")
+      :depends-on ("core" "ecs" "renderer" "asset" "input" "physics" "animation"
+                   "particles" "camera" "tilemap" "ui" "audio")
       :pathname "runtime"
       :components
       ((:file "run")

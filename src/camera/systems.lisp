@@ -2,7 +2,7 @@
 
 (in-package :cl-aliengine)
 
-(defsystem update-camera :with (camera)
+(defsystem update-camera :with (camera) :stage (:update)
   "Move the camera toward its TARGET using delta-time-independent lerp, then
   clamp the result within the declared world bounds.  Writes the final position
   to *CAMERA-X* and *CAMERA-Y* so DRAW-TEXTURE picks it up automatically.

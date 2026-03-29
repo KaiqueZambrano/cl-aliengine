@@ -2,7 +2,7 @@
 
 (in-package :cl-aliengine)
 
-(defsystem render-tilemaps :with (transform tilemap)
+(defsystem render-tilemaps :with (transform tilemap) :stage (:render) :priority 0
   "Draw all visible tile layers of every entity that has TRANSFORM and TILEMAP.
   The transform's X/Y is used as the world-space origin of the map.
   Call this before RENDER-SPRITES so the map renders behind sprites."

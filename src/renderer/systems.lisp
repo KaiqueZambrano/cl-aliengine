@@ -2,7 +2,7 @@
 
 (in-package :cl-aliengine)
 
-(defsystem render-sprites :with (transform sprite)
+(defsystem render-sprites :with (transform sprite) :stage (:render) :priority 10
   "Enqueue a draw call for every entity with both TRANSFORM and SPRITE.
   Scale is applied uniformly to SRC-W and SRC-H.  Call this after ANIMATE
   so the source rectangle reflects the current frame."

@@ -2,7 +2,7 @@
 
 (in-package :cl-aliengine)
 
-(defsystem animate :with (sprite animator)
+(defsystem animate :with (sprite animator) :stage (:update)
   "Advance the animator and update the sprite's source rectangle each frame.
   Handles animation switching, looping, and one-shot playback.
   TEXTURE is swapped on the sprite if the animation plist provides one."

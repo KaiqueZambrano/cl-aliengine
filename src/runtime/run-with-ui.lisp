@@ -1,4 +1,4 @@
-;; run-with-ui.lisp
+;; src/runtime/run-with-ui.lisp
 
 (in-package :cl-aliengine)
 
@@ -21,12 +21,17 @@
     7. glfwSwapBuffers.
     8. FPS cap if requested.
 
-  On exit, NUI-SHUTDOWN is called automatically before GLFW terminates."
+  On exit, audio is freed, NUI-SHUTDOWN is called, then GLFW terminates."
   (unless (= (glfw-init) 1)
     (error "GLFW initialisation failed"))
 
+  ;; Audio does not require a GL context — initialise before the window.
+  (unless (audio-init)
+    (warn "Audio initialisation failed — continuing without sound."))
+
   (let ((win (glfw-create-window width height title (null-ptr) (null-ptr))))
     (when (null-ptr-p win)
+      (audio-shutdown)
       (glfw-terminate)
       (error "Failed to create GLFW window"))
 
@@ -41,6 +46,7 @@
 
     (let ((nk-ctx (%nk-init win)))
       (when (null-ptr-p nk-ctx)
+        (audio-shutdown)
         (glfw-terminate)
         (error "Nuklear initialisation failed"))
       (setf *nk-ctx*    nk-ctx
@@ -93,6 +99,10 @@
 
         (when *current-scene*
           (funcall (getf *current-scene* :on-exit)))
+
+        ;; Free audio sources before shutting down the engine.
+        (audio-free-all)
+        (audio-shutdown)
 
         (nui-shutdown)
         (asset-free-all)
